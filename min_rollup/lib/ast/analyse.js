@@ -1,5 +1,6 @@
 const walk = require('./walk');
 const Scope = require('./scope');
+const { hasOwnProperty } = require('../utils');
 /**
  * 分析对应模块的语法树
  * @param {*} ast 语法树
@@ -13,8 +14,9 @@ function analyse(ast, code, module) {
       _included: { value: false, writable: true }, // 这条语句默认不包括在输出结果里
       _module: { value: module }, // 当前模块
       _source: { value: code.snip(statement.start, statement.end) }, // 当前模块的源代码
-      _dependsOn: { value: [] }, // 当前模块依赖的模块
-      _defines: { value: [] }, // 当前模块定义的变量
+      _dependsOn: { value: [] }, // 当前语句依赖的模块
+      _defines: { value: [] }, // 当前语句定义的变量
+      _modifies: { value: [] }, // 当前语句修改的变量
     });
     if (statement.type === 'ImportDeclaration') { // 如果语句类型是导入声明
       let source = statement.source.value; // 获取导入的模块相对路径
@@ -54,14 +56,34 @@ function analyse(ast, code, module) {
         module.definitions[name] = statement; // 此顶级变量的定义语句就是这个语句
       }
     }
+    function checkForReads(node) {
+      if (node.type === 'Identifier') { // 如果节点类型是标识符
+        statement._dependsOn[node.name] = true; // 表示当前语句依赖了node.name这个变量
+      }
+    }
+    function checkForWrites(node) {
+      function addNode(node) {
+        const { name } = node;
+        statement._modifies[name] = true; // 此语句修改了呃node.name这个变量
+        if(!hasOwnProperty(module.modifications, name)) { // 还没初始化，就空数组初始化一下
+          module.modifications[name] = []; // module.modifications对象，属性是变量名，值是修改语句组成的数组
+        }
+        module.modifications[name].push(statement);
+      }
+      if (node.type === 'AssignmentExpression') { // 赋值表达式
+        addNode(node.left);
+      } else if (node.type === 'UpdateExpression') { // 更新表达式（++、--）
+        addNode(node.argument);
+      }
+    }
     walk(statement, {
       enter(node) {
-        if (node.type === 'Identifier') { // 如果节点类型是标识符
-          statement._dependsOn[node.name] = true; // 表示当前语句依赖了node.name这个变量
-        }
+        checkForReads(node);
+        checkForWrites(node);
         let newScope;
         switch (node.type) {
           case 'FunctionDeclaration': // 函数声明
+          case 'ArrowFunctionDeclaration': // 箭头函数声明
             addToScope(node.id.name); // 添加函数名到作用域
             const names = node.params.map(param => param.name); // 获取函数参数
             newScope = new Scope({

@@ -5,7 +5,8 @@ const Module = require('./module');
 class Bundle {
   constructor(options) {
     // 入口文件路径绝对路径生产
-    this.entryPath = path.resolve(options.entry);
+    this.entryPath = path.resolve(options.entry.replace(/\.js$/, '')+'.js');
+    this.modules = new Set();
   }
   build(output) {
     const entryModule = this.fetchModule(this.entryPath);
@@ -18,6 +19,9 @@ class Bundle {
     let bundle = new MagicString.Bundle();
     this.statements.forEach(statement=>{
       const source = statement._source.clone();
+      if (statement.type === 'ExportNamedDeclaration') {
+        source.remove(statement.start, statement.declaration.start);
+      }
       bundle.addSource({
         content: source,
         separator: '\n', // 分隔符
@@ -26,8 +30,23 @@ class Bundle {
     return {code: bundle.toString()};
   }
 
-  fetchModule(importee) {
-    let route = importee;
+  /**
+   * 
+   * @param {*} importee 被引入的模块
+   * @param {*} importer 引入模块的模块
+   * @returns 
+   */
+  fetchModule(importee, importer) {
+    let route;
+    if (!importee) {
+      route = importee
+    } else {
+      if (path.isAbsolute(importee)) {
+        route = importee.replace(/\.js$/, '')+'.js';
+      } else {
+        route = path.resolve(path.dirname(importer), importee.replace(/\.js$/, '')+'.js');
+      }
+    }
     if (route) {
       // 读取文件内容
       const code = fs.readFileSync(route, 'utf-8');
@@ -37,6 +56,7 @@ class Bundle {
         path: route, // 模块的绝对路径
         bundle: this // 当前的 bundle 实例
       });
+      this.modules.add(module); // 把模块实例添加到集合中
       return module;
     }
   }

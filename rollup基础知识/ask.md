@@ -20,3 +20,19 @@ rollup 本身没有 loader 只有 插件（函数）。其中 @ 的是官方插�
 3. iife：立即执行函数
 4. umd：(function(global,factory))()
 5. cjs：commonjs 
+
+### tree-shaking
+1. 第一步
+- 在 `module` 中收集 `imports`、`exports` 和 `definitions`
+- 在 `analyse` 收集 `_defines` 和 `_dependsOn`
+2. 第二步
+- 重构 `expandAllStatements`
+#### 简易解释
+例如在main.js中引入msg.js
+1. 找到这个语句读到或者使用的变量
+2. 查找此变量name变量的定义语句，并添加到最终输出结果中
+3. 判断name变量是不是外部导入的
+4. 如果是，先获取外部模块的定义（msg.js）
+5. 找到msg.js中定义name变量的语句，放到输出结果里
+
+其实是用到的拿过来，没用到的没有处理
