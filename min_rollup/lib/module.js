@@ -2,6 +2,7 @@ const MagicString = require('magic-string');
 const { parse } = require('acorn');
 const analyse = require('./ast/analyse');
 const { hasOwnProperty } = require('./utils');
+const SYSTEM_VARS = ['console', 'log']; // 系统变量
 class Module {
   constructor({code,path,bundle}) {
     this.code = new MagicString(code); // 源代码
@@ -33,6 +34,8 @@ class Module {
     let allStatement = [];
     this.ast.body.forEach(statement => {
       if (statement.type === 'ImportDeclaration') return;
+      // 默认情况下不包括所有的变量声明语句
+      if (statement.type === 'VariableDeclaration') return;
       let statements = this.expandStatement(statement);
       allStatement.push(...statements);
     })
@@ -45,8 +48,8 @@ class Module {
     statement._included = true; // 是否包含
     let result = [];
     // 找到此语句使用的所有变量，并把这些变量的定义语句取出来，放到result数组中
-    const _dependsOn = Object.keys(statement._dependsOn);
-    _dependsOn.forEach(name=>{
+    const _dependsOn = Object.keys(statement._dependsOn); // 1. 一定是先处理依赖的变量
+    _dependsOn.forEach(name=>{ // 2. 随后处理依赖变量的定义语句
       // 找到此变量的定义语句，添加到结果里
       let definitions = this.define(name);
       result.push(...definitions);
@@ -86,10 +89,20 @@ class Module {
     } else {
       // 如果非导入模块，是本地模块的话，获取此变量的变量定义语句
       let statement = this.definitions[name];
-      if (statement && !statement._included) {
-        return this.expandStatement(statement)
-      } else {
-        return [];
+      if (statement) {
+        if (statement._included) { // 如果此语句已经包含在结果里了，说明是重复的
+          // 直接返回空数组
+          return [];
+        } else { // 如果此语句没有包含在结果里
+          // 说明是第一次使用这个变量,展开
+          return this.expandStatement(statement);
+        }
+      } else { // 如果没有找到这个变量的定义语句
+        if (SYSTEM_VARS.includes(name)) { // 如果是系统变量，直接返回空数组
+          return [];
+        } else { // 如果不是系统变量，说明是一个错误
+          throw new Error(`找不到变量${name}的定义语句(没有从外部导入，也没有内部声明)`);
+        }
       }
     }
   }

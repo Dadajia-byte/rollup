@@ -1,5 +1,5 @@
 import { name, age as a } from './msg';
-function say() {
-  console.log('hello', name);
+if (true) {
+  var k = '变量提升';
 }
-say();
+console.log(k);

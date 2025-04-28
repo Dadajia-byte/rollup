@@ -49,9 +49,9 @@ function analyse(ast, code, module) {
   // 还得确定这个变量是局部变量还是全局变量
   let currentScope = new Scope({name: '模块内的顶级作用域'}); // 创建顶级作用域
   ast.body.forEach(statement=>{
-    function addToScope(name) {
-      currentScope.add(name); // 把此变量名添加到当前作用域的变量数组中
-      if (!currentScope.parent) { // 如果当前作用域没有父作用域, 说明是顶级作用域
+    function addToScope(name, isBlockDeclartion) {
+      currentScope.add(name, isBlockDeclartion); // 把此变量名添加到当前作用域的变量数组中
+      if (!currentScope.parent || (currentScope.isBlock && !isBlockDeclartion)) { // 如果当前作用域没有父作用域, 说明是顶级作用域 || 或者当前作用域是块级作用域，且此变量不是块级变量
         statement._defines[name] = true; // 表示当前语句定义了name这个变量顶级变量 
         module.definitions[name] = statement; // 此顶级变量的定义语句就是这个语句
       }
@@ -89,14 +89,24 @@ function analyse(ast, code, module) {
             newScope = new Scope({
               name: node.id.name, 
               parent: currentScope, // 创建新作用域时，父作用域就是当前作用域
-              names
+              names,
+              isBlock: false // 函数作用域不是块级作用域
             }); // 创建函数作用域
             break;
           case 'VariableDeclaration': // 变量声明
             const declarations = node.declarations;
             declarations.forEach(declaration => {
-              const localName = declaration.id.name; // 获取变量名
-              addToScope(localName); // 添加到作用域
+              if (node.kind === 'let' || node.kind === 'const') {
+                addToScope(declaration.id.name, true); // 添加到作用域
+              } else {
+                addToScope(declaration.id.name); // 添加到作用域
+              }
+            });
+            break;
+          case 'BlockStatement': // 块级作用域
+            newScope = new Scope({
+              parent: currentScope, // 创建新作用域时，父作用域就是当前作用域
+              isBlock: true // 块级作用域
             });
             break;
           default:
