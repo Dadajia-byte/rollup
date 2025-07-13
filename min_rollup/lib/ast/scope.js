@@ -10,10 +10,8 @@ class Scope {
     this.isBlock = !!options.isBlock;
   }
   add(name, isBlockDeclaration) {
-    // 如果此变量不是块级变量 var，并且当前作用域是块级作用域
+    // 如果此变量不是块级变量【即它是 var 声明的】，并且当前作用域是块级作用域
     if (!isBlockDeclaration && this.isBlock) {
-      console.log(this.parent, '添加变量', name, 123);
-      
       this.parent.add(name, isBlockDeclaration) // 添加到父作用域(变量提升)
     } else {
       // 添加变量

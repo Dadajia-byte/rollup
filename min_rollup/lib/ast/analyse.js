@@ -46,9 +46,14 @@ function analyse(ast, code, module) {
   });
   // 开启第二轮循环，创建作用域链
   // 需要知道当前模块需要用到哪些变量，用到的变量留下，没用到的不管理
-  // 还得确定这个变量是局部变量还是全局变量
+  // 还得确定这个变量是局部变量还是全局变量【更准确的说是当前作用域下的顶级变量】
   let currentScope = new Scope({name: '模块内的顶级作用域'}); // 创建顶级作用域
   ast.body.forEach(statement=>{
+    /**
+     * 添加变量到作用域
+     * @param {*} name 变量名
+     * @param {*} isBlockDeclartion 是否是块级变量
+     */
     function addToScope(name, isBlockDeclartion) {
       currentScope.add(name, isBlockDeclartion); // 把此变量名添加到当前作用域的变量数组中
       if (!currentScope.parent || (currentScope.isBlock && !isBlockDeclartion)) { // 如果当前作用域没有父作用域, 说明是顶级作用域 || 或者当前作用域是块级作用域，且此变量不是块级变量
@@ -56,12 +61,21 @@ function analyse(ast, code, module) {
         module.definitions[name] = statement; // 此顶级变量的定义语句就是这个语句
       }
     }
+    /**
+     * 检查当前语句是否读取了某个变量
+     * @param {*} node 节点
+     */
     function checkForReads(node) {
       if (node.type === 'Identifier') { // 如果节点类型是标识符
         statement._dependsOn[node.name] = true; // 表示当前语句依赖了node.name这个变量
       }
     }
+    /**
+     * 检查当前语句是否修改了某个变量
+     * @param {*} node 
+     */
     function checkForWrites(node) {
+      // 添加节点到语句的_modifies数组中
       function addNode(node) {
         const { name } = node;
         statement._modifies[name] = true; // 此语句修改了呃node.name这个变量

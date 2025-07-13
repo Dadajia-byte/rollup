@@ -21,7 +21,7 @@ class Module {
     this.definitions = {};
     // 存放变量修改语句
     this.modifications = {};
-    // 分析语法树
+    // 分析语法树【module实例化时，静态分析module，分析出当前模块的依赖关系】
     analyse(this.ast, this.code, this);
     // console.log('imports', this.imports);
     // console.log('exports', this.exports);
@@ -43,6 +43,12 @@ class Module {
   }
   /**
    * 展开语句
+   * 一定是先处理依赖的变量，再处理定义的变量
+   * 例如：
+   * let x = y + 1;  // 当前语句：依赖变量y，定义变量x
+   * x = x * 2;      // 当前语句：依赖变量x，修改变量x
+   * 处理x时，一定得先知道y，所以y的定义语句一定得先处理
+   * 处理x时，一定得先知道x，所以x的修改语句一定得后处理
    */
   expandStatement(statement) {
     statement._included = true; // 是否包含
