@@ -1,4 +1,10 @@
 {
+  "name": "min_rollup",
+  "version": "1.0.0",
+  "main": "rollup.config.js",
+  "scripts": {
+    "build": "rollup -c"
+  },
   "dependencies": {
     "acorn": "^8.14.1",
     "magic-string": "^0.30.17",

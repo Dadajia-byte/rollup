@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const MagicString = require('magic-string');
 const Module = require('./module');
+const { hasOwnProperty, replaceIdentifier } = require('./utils');
 class Bundle {
   constructor(options) {
     // 入口文件路径绝对路径生产
@@ -11,17 +12,54 @@ class Bundle {
   build(output) {
     const entryModule = this.fetchModule(this.entryPath);
     this.statements = entryModule.expandAllStatements();
+    this.deconflict();
     const {code} = this.generate();
     fs.writeFileSync(output, code);
+  }
+
+  deconflict() {
+    const defines = {}; // 定义的变量
+    const conflicts = {}; // 冲突的变量
+    this.statements.forEach(statement=>{
+      Object.keys(statement._defines).forEach(name=>{
+        if(hasOwnProperty(defines, name)) {
+          conflicts[name] = true;
+        } else {
+          defines[name] = [];
+        }
+        // 把定义的变量对应的模块添加到数组
+        defines[name].push(statement._module);
+      })
+    });
+    // 获取冲突变量名数组
+    Object.keys(conflicts).forEach(name=>{
+      const modules = defines[name];
+      modules.pop(); // 最后一个变量不需要重命名
+      modules.forEach((module, index)=>{
+        let replaceName = `${name}$$${modules.length - index}`;
+        module.rename(name, replaceName);
+      })
+    })
   }
 
   generate() {
     let bundle = new MagicString.Bundle();
     this.statements.forEach(statement=>{
+      let replaceName = {};
+      // 获取依赖的变量名和定义的变量数组
+      Object.keys(statement._dependsOn)
+        .concat(Object.keys(statement._defines))
+        .forEach(name=>{
+          const canonicalName = statement._module.getCanonicalName(name);
+          if(canonicalName !== name) {
+            replaceName[name] = canonicalName;
+          }
+      });
       const source = statement._source.clone();
       if (statement.type === 'ExportNamedDeclaration') {
         source.remove(statement.start, statement.declaration.start);
       }
+      replaceIdentifier(statement, source, replaceName);
       bundle.addSource({
         content: source,
         separator: '\n', // 分隔符

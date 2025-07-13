@@ -21,6 +21,8 @@ class Module {
     this.definitions = {};
     // 存放变量修改语句
     this.modifications = {};
+    // 存放变量名和变量名的映射关系
+    this.canonicalNames = {};
     // 分析语法树【module实例化时，静态分析module，分析出当前模块的依赖关系】
     analyse(this.ast, this.code, this);
     // console.log('imports', this.imports);
@@ -111,6 +113,14 @@ class Module {
         }
       }
     }
+  }
+
+  rename(name, replaceName) {
+    this.canonicalNames[name] = replaceName;
+  }
+
+  getCanonicalName(name) {
+    return this.canonicalNames[name] || name;
   }
 }
 
